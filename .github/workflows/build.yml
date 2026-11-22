@@ -1,0 +1,70 @@
+# Build check: every push to main and every pull request builds the Ration Seal Store from this source, so anyone
+# can see that the code compiles as published. It is not how releases are made: the release zip is built locally
+# (scripts/package-mod.ps1) and tested in the game first. The build output is kept for 7 days as an unofficial test
+# build, never as a release.
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only: this workflow can't change the repository, and it uses no secrets.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Win32 Release build
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      # actions/checkout v7.0.1, pinned to its commit.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      # The pinned ds3mod.h, mod.ini, CHANGELOG.txt and README.md, before building.
+      - name: Check the header pin, the manifest, the changelog and the README
+        run: ./scripts/package-mod.ps1 -CheckOnly
+
+      # Dead Space 3 is 32-bit, so every mod is a 32-bit DLL (-A Win32).
+      - name: Configure
+        run: cmake -S . -B build -A Win32
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Check that the mod was built, 32-bit
+        run: |
+          $f = 'build/plugins/SealStore/SealStore.asi'
+          if (-not (Test-Path -LiteralPath $f)) { throw "missing: $f" }
+          $bytes = [IO.File]::ReadAllBytes((Resolve-Path $f))
+          $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+          if ([BitConverter]::ToUInt16($bytes, $pe + 4) -ne 0x14C) { throw "not a 32-bit DLL: $f" }
+          foreach ($g in 'build/plugins/SealStore/mod.ini', 'build/plugins/SealStore/CHANGELOG.txt') {
+            if (-not (Test-Path -LiteralPath $g)) { throw "missing: $g" }
+          }
+          "ok  $f"
+
+      - name: Label the output as a test build
+        run: |
+          # Parentheses: without them the comma binds first and the + joins all three lines into one.
+          Set-Content -Encoding utf8 build/NOT-A-RELEASE.txt @(
+            ('Unofficial test build made by GitHub Actions from commit ' + $env:GITHUB_SHA + '.'),
+            'It shows that the source compiles. It was not tested in the game.',
+            'To play, use the release download on the Releases page instead.'
+          )
+
+      # actions/upload-artifact v7.0.2, pinned to its commit. Kept for 7 days.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: unofficial-test-build-${{ github.sha }}
+          path: |
+            build/NOT-A-RELEASE.txt
+            build/plugins/SealStore/
+          retention-days: 7
+          if-no-files-found: error

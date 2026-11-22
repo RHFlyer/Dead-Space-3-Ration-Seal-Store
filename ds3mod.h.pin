@@ -1,0 +1,7 @@
+; ds3mod.h is a copy of the DS3 Mod Loader's SDK header from one loader release, the oldest this mod works with.
+; Don't edit it: the build check (scripts/package-mod.ps1 -CheckOnly) compares it with the blob below. To move to a
+; newer API, copy that loader release's sdk/ds3mod.h, change these four lines and min_loader= in mod.ini together.
+loader=1.0.0
+api=3
+blob=f39f23118919e0beb496e91a1469a262d86c681e
+source=https://github.com/RHFlyer/Dead-Space-3-Mod-Loader/blob/v1.0.0/sdk/ds3mod.h

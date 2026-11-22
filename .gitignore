@@ -1,0 +1,8 @@
+build/
+release/
+*.log
+*.user
+.vs/
+# The player's settings and the store's pity counts never belong in the repo.
+seal_store.ini
+ds3_seals_state.ini
